@@ -1,0 +1,565 @@
+---
+title: "cv_w_temp_RH"
+author: "Vinny Paris, amended by P.L."
+date: "Finalized on Feburary 7th, 2023"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r}
+#load relevant package
+#version 1.4.1 of readxl
+#verson 3.1-160 of nlme
+library(readxl)
+library(nlme)
+
+#read in the data
+my_data <- read.csv('full_exp_data3_18_days_updated.csv')
+
+
+#treat hour as a factor allowing a unique value
+#for each hour of the day to capture diurnal 
+#rhythms without assumptions about polynomial
+#orders for a linear approach
+my_data$hr <- as.factor(my_data$hr)
+
+
+#run the model using gls on the full data
+#and it's accompanying anova. Response is
+#logged at base 10 and is a function of
+#relative humidity (RH), hour (hr),
+#weekend status (weekend), temperature (temp),
+#kryton unit status. 
+#This is fitting an AR 1 correlation 
+#structure to the data
+my_mod_total_log <- gls(log(total_pm, 10) ~ 
+                          RH +
+                          hr + 
+                          weekend +
+                          temp +
+                          kryton_unit_on, 
+                        data = my_data, 
+                        correlation=corAR1(),
+                        na.action = na.omit)
+
+
+#Analysis of Deviance table.
+#Note the factor of interest (kryton_unit_on)
+#is the last of a type 1 deviance table; that 
+#is it is (correctly) in the most conservative
+#location (as in all variance that can be explained
+#in the response by the other factors has been 
+#removed
+anova(my_mod_total_log)
+####################################
+
+#read in those days
+#day1 <- cbind(0, FALSE, read.csv('day28_off.csv'))
+#day1 <- day1[c(1:(4910/30))*30 - 1,]
+#day2 <- cbind(1, FALSE, read.csv('day29_on.csv'))
+#day3 <- cbind(1, FALSE, read.csv('day30_on.csv'))
+#day4 <- cbind(1, FALSE, read.csv('day31_on.csv'))
+#day5 <- cbind(1, FALSE, read.csv('day01_on.csv'))
+
+
+#read pilot data in and look at it some
+data_cv <- read.csv('kryton_data_5_days_updated.csv')
+head(data_cv)
+
+#plot the data
+#plot(1:1424, log(data_cv$TOTAL, 10),
+    # col = data_cv$kryton_unit_on + 3,
+   #  main = "TSP (log10)",
+   #  xlab = "Day",
+   #  ylab = 'TSP (log10)',
+   #  xaxt = "n")
+
+#Fixed this issue of subscript on Feb. 3, 2023
+#Base plot of the data plotted chronologically
+#along the x-axis and the log of pm total on
+#y-axis. 
+plot(1:1424, log(data_cv$TOTAL, 10),
+     col = data_cv$kryton_unit_on + 3,
+     main = "",
+     xlab = "Day",
+     #ylab = expression(paste("TSP (log[",10,"])")),
+     #ylab = bquote(TSP_Concentrations ~ (log[10])),
+     ylab = expression(TSP * " Concentrations" ~ (log[10])),
+     xaxt = "n")
+
+#Adding tick marks at midnight (or closest
+#approximation) to denote differences in days
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+#labeling the days
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+     c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+
+
+#Mean log total pm by day
+aggregate(log(data_cv$TOTAL, 10), by = list(data_cv$Day), mean)
+
+#mean log total by kryton unit status
+aggregate(log(data_cv$TOTAL, 10), by = list(data_cv$kryton_unit_on), mean)
+
+
+#making the hour variable in the pilot
+#data a factor for similar reasons as earlier
+data_cv$hr <- as.factor(data_cv$hr)
+
+#make predictions based on the 
+#model trained using the main experiment
+#using the pilot data's factors to make
+#the predictions
+new_preds <- predict(my_mod_total_log,
+                     newdata = data_cv[c(1,2,10,11,12)],
+                     
+                     na.action = na.omit)
+
+#see the new predictions
+#set 1 pane in each R graph window
+par(mfrow = c(1,1))
+
+#plot the new predictions; similar as above
+plot(1:1424, new_preds,
+     xlab = 'Day', 
+     #ylab = 'Predicted TSP Concentration (log10)',
+      #ylab = expression(Predicted * " TSP Concentration " ~ "["(log[10]) * (mu * g/m^3)"]"),
+ylab = bquote(Predicted * " TSP Concentration " ~ "[" ~ log[10]  * " "(mu * g/m^3) ~ "]"),
+     main = "Predicted",
+     xaxt = 'n',
+     cex.axis=1.2,
+     cex.lab = 1.5)
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+
+
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+      c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+
+#see the new predictions with the obs posted as well
+
+
+#ploting 
+plot(1:1424, log(data_cv$TOTAL,10),
+       col = 'green', pch = 15,  #lty, lwd  
+     xlab = 'Day', 
+     #ylab = 'Measured TSP (log10)', xaxt = "n")
+ylab = bquote(Measured * " TSP Concentration " ~ "[" ~ log[10]  * " "(mu * g/m^3) ~ "]"),
+     cex.axis=1.2,
+     cex.lab = 1.5)
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+par(mar = c(5, 4, 4, 2) + 1.5)
+
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+      c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+
+#cross validation score using mean square error
+#for log total pm
+#calculate the actual MSE using known pilot
+#data results vs our predictions
+cv_tested_total <- sum((log(data_cv$TOTAL,10) - new_preds)^2)/length(new_preds)
+cv_tested_total
+
+#create an idealized model where
+#the observations are fully independent
+#which we do not have but geometrically
+#it's results will still minimize MSE.
+#Note we are using the same factors.
+my_mod_total_log_ideal <- lm(log(TOTAL, 10) ~
+                           RH +
+                          temp + 
+                          weekend + 
+                          hr +
+                          kryton_unit_on, 
+                        data = data_cv, 
+                        na.action = na.omit)
+
+#calculate the MSE of this model
+cv_trained_total <- sum((log(data_cv$TOTAL, 10) - predict(my_mod_total_log_ideal))^2)/dim(data_cv)[1]
+cv_trained_total
+
+
+#plot the pilot data results (points), the MSE-minimizing
+#line, and our model's predictions with pm on the y-axis
+#and time on the x-axis.
+
+
+#updated with line type, legend etc. on Feb. 7, 2023
+plot(log(data_cv$TOTAL, 10), ylim = c(1,2.7), xaxt = "n", 
+     #ylim = the scale of y axis
+      xlab = 'Day',
+      #ylab = expression(TSP * " Concentration " ~ (log[10])),
+     ylab = bquote(" TSP Concentration " ~ "[" ~ log[10]  * " "(mu * g/m^3) ~ "]"),
+     cex.axis=1.2,
+     cex.lab = 1.5)
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+par(mar = c(5, 4, 4, 2) + 1.5)
+  
+#add lines
+#green for Raw pilot data modeled
+#purple for the main experiment model
+lines(predict(my_mod_total_log_ideal), col = 'green', lwd = 3, lty=2)
+lines(new_preds, col = 'purple', lwd = 3, lty = 3)
+
+
+#add legend
+legend("topright", c("Raw Data", "Raw Data Modeled", "Predicted"), 
+       col = c("black", "green","purple"), lwd = c(1, 3,3), lty = c(1,2,3))
+
+#axis and tickmarks again
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+      c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+```
+The black circles represent the actual observed data points. The purple line is the predictions for the trained model based off of days 8-25 (the main model). Likewise the green line is the predictions based off of a model created using the pilot data (days 1-5). 
+
+To begin with the cross validation statistic we are using is a (naive) mean square error (so the residuals are squared and then averaged). Ultimately this isn't a great metric as it ignores the fact the errors are correlated and can produce some (clearly) incorrect conclusions (e.g. our training data model shouldn't outperform the pilot/test data model when predicting the pilot/test data. I don't think the cv values are useless as they still give *some* idea of "goodness of fit" and mean squared error is a well known/respected metric.
+
+So the three scores reported for each pm size is the cross validation statistic (cv) for the trained model, the cv for the test data model, and the ratio of the two showing the percent our (naive) mse increased
+
+That being said I think you'll want to lean into the the graphics to display how well our model is doing. The kryton unit is cleaning the air in a predictable and uniform manner and our model is capturing the general air quality in the room to a fair degree. 
+
+# Results for other PM sizes
+
+```{r}
+#################
+#################
+#The remaining code is repitious of the earlier
+#code and the commenting will reflect that
+#################
+#################
+my_mod_pm1_log <- gls(log(PM1, 10) ~ 
+                           RH +
+                          weekend +
+                          temp + 
+                          hr +
+                          kryton_unit_on,  
+                        data = my_data, 
+                        correlation=corAR1(),
+                        na.action = na.omit)
+
+#the anova table for the main experiment (days 8-25ish)
+anova(my_mod_pm1_log)
+
+#make predictions
+new_preds_pm1 <- predict(my_mod_pm1_log,
+                     newdata = data_cv[c(1,2,10,11, 12)],
+                     na.action = na.omit)
+
+
+#cross validation score using mean square error
+#for log total pm
+cv_tested1 <- sum((log(data_cv$PM1,10) - new_preds_pm1)^2)/
+  length(new_preds_pm1)
+cv_tested1
+
+#Now for the idealized model trained on the test set
+
+my_mod_pm1_log_ideal <- lm(log(PM1, 10) ~
+                          RH +
+                          temp + 
+                          weekend +
+                          hr +
+                          kryton_unit_on, 
+                        data = data_cv, 
+                        na.action = na.omit)
+
+cv_trained1 <- sum((log(data_cv$PM1, 10) - predict(my_mod_pm1_log_ideal))^2)/dim(data_cv)[1]
+cv_trained1
+
+cv_tested1/cv_trained1
+
+
+#updated with line type, legend etc. on Feb. 7, 2023
+plot(log(data_cv$PM1, 10), ylim = c(1,2.5), xaxt = "n", 
+     #ylim = the scale of y axis
+      xlab = 'Day',
+      ylab = bquote(PM[1]~ Concentration ~ "[" ~ log[10] * (mu * g/m^3) ~ "]"),
+     cex.axis=1.2,
+     cex.lab = 1.5)
+
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+par(mar = c(5, 4, 4, 2) + 1.5)
+
+
+lines(predict(my_mod_pm1_log_ideal), col = 'green', lwd = 3, lty=2)
+lines(new_preds, col = 'purple', lwd = 3, lty = 3)
+
+legend("topright", c("Raw Data", "Raw Data Modeled", "Predicted"), 
+       col = c("black", "green","purple"), lwd = c(1,3,3), lty = c(1,2,3))
+
+
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+      c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+
+#########################
+#########################
+#########################
+#################
+my_mod_pm2.5_log <- gls(log(PM2.5, 10) ~  
+                          RH +
+                          temp + 
+                          weekend + 
+                          hr +
+                          kryton_unit_on, 
+                      data = my_data, 
+                      correlation=corAR1(),
+                      na.action = na.omit)
+
+#make predictions
+new_preds <- predict(my_mod_pm2.5_log,
+                     newdata = data_cv[c(1,2,10,11, 12)],
+                     na.action = na.omit)
+
+#cross validation score using mean square error
+#for log10 based TSP
+cv_tested2.5 <- sum((log(data_cv$PM2.5,10) - new_preds)^2)/
+  length(new_preds)
+
+cv_tested2.5
+
+#Now for the idealized model trained on the test set
+
+my_mod_pm2.5_log_ideal <- lm(log(PM2.5, 10) ~ 
+                           RH +
+                          temp + 
+                          weekend +
+                          hr +
+                          kryton_unit_on, 
+                        data = data_cv, 
+                        na.action = na.omit)
+
+cv_trained2.5 <- sum((log(data_cv$PM2.5, 10) - predict(my_mod_pm2.5_log_ideal))^2)/dim(data_cv)[1]
+
+cv_trained2.5
+
+cv_tested2.5/cv_trained2.5
+
+#updated with line type, legend etc. on Feb. 7, 2023
+
+plot(log(data_cv$PM2.5, 10), ylim = c(1,2.5), xaxt = "n", 
+     #ylim = the scale of y axis
+      xlab = 'Day',
+      #ylab = expression(PM[2.5] * " Concentration " ~ (log[10])),
+      ylab = bquote(PM[2.5]~ Concentration ~ "[" ~ log[10] * (mu * g/m^3) ~ "]"),
+     cex.axis=1.2,
+     cex.lab = 1.5)
+
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+par(mar = c(5, 4, 4, 2) + 1.5)
+
+
+
+lines(predict(my_mod_pm2.5_log_ideal), col = 'green', lwd = 3, lty=2)
+lines(new_preds, col = 'purple', lwd = 3, lty = 3)
+
+legend("topright", c("Raw Data", "Raw Data Modeled", "Predicted"), 
+       col = c("black", "green","purple"), lwd = c(1, 3,3), lty = c(1,2,3))
+
+
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+     c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+
+#################
+#################
+#################
+my_mod_pm4_log <- gls(log(PM4, 10) ~ 
+                           RH  +
+                          temp + 
+                        weekend + 
+                          hr +
+                          kryton_unit_on, 
+                      data = my_data, 
+                      correlation=corAR1(),
+                      na.action = na.omit)
+
+#make predictions
+new_preds <- predict(my_mod_pm4_log,
+                     newdata = data_cv[c(1,2,10,11, 12)],
+                     na.action = na.omit)
+
+
+#cross validation score using mean square error
+#for log total pm
+cv_tested4 <- sum((log(data_cv$RESP,10) - new_preds)^2)/
+  length(new_preds)
+
+cv_tested4
+
+
+
+#Now for the idealized model trained on the test set
+
+my_mod_pm4_log_ideal <- lm(log(RESP, 10) ~  
+                           RH +
+                          temp + 
+                          weekend +
+                          hr +
+                          kryton_unit_on, 
+                        data = data_cv, 
+                        na.action = na.omit)
+
+cv_trained4 <- sum((log(data_cv$RESP, 10) - predict(my_mod_pm4_log_ideal))^2)/dim(data_cv)[1]
+
+cv_trained4
+
+cv_tested4/cv_trained4
+
+
+#updated with line type, legend etc. on Feb. 7, 2023
+
+plot(log(data_cv$RESP, 10), ylim = c(1,2.5), xaxt = "n", 
+     #ylim = the scale of y axis
+      xlab = 'Day',
+      #ylab = expression(PM[4] * " Concentration " ~ (log[10])),
+     ylab = bquote(PM[4]~ Concentration ~ "[" ~ log[10] * (mu * g/m^3) ~ "]"),
+     cex.axis=1.2,
+     cex.lab = 1.5)
+
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+par(mar = c(5, 4, 4, 2) + 1.5)
+
+lines(predict(my_mod_pm4_log_ideal), col = 'green', lwd = 3, lty=2)
+lines(new_preds, col = 'purple', lwd = 3, lty = 3)
+
+legend("topright", c("Raw Data", "Raw Data Modeled", "Predicted"), 
+       col = c("black", "green","purple"), lwd = c(1, 3,3), lty = c(1,2,3))
+
+
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+     c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+
+#################
+#################
+#################
+my_mod_pm10_log <- gls(log(PM10, 10) ~  
+                           RH +
+                          temp + 
+                         weekend + 
+                          hr +
+                          kryton_unit_on, 
+                      data = my_data, 
+                      correlation=corAR1(value = .8),
+                      na.action = na.omit)
+
+#make predictions
+new_preds <- predict(my_mod_pm10_log,
+                     newdata = data_cv[c(1,2,10,11, 12)],
+                     na.action = na.omit)
+
+
+#cross validation score using mean square error
+#for log total pm
+cv_tested10 <- sum((log(data_cv$PM10,10) - new_preds)^2)/
+  length(new_preds)
+
+
+cv_tested10
+#The final number reported are mean square error
+#for the cross validation step
+
+
+#Now for the idealized model trained on the test set
+
+my_mod_pm10_log_ideal <- lm(log(PM10, 10) ~ 
+                          RH +
+                          temp + 
+                          weekend + 
+                          hr +
+                          kryton_unit_on, 
+                        data = data_cv, 
+                        na.action = na.omit)
+
+  cv_trained10 <- sum((log(data_cv$PM10, 10) - predict(my_mod_pm10_log_ideal))^2)/dim(data_cv)[1]
+
+
+cv_trained10
+
+cv_tested10/cv_trained10
+
+
+plot(log(data_cv$PM10, 10), ylim = c(1,2.5), xaxt = "n", 
+     #ylim = the scale of y axis
+      xlab = 'Day',
+      #ylab = expression(PM[10] * " Concentration " ~ (log[10])),
+     ylab = bquote(PM[10]~ Concentration ~ "[" ~ log[10] * (mu * g/m^3) ~ "]"),
+     cex.axis=1.2,
+     cex.lab = 1.5)
+
+par(cex.axis=1.2)
+par(cex.lab=1.5)
+par(mar = c(5, 4, 4, 2) + 1.5)
+     
+lines(predict(my_mod_pm4_log_ideal), col = 'green', lwd = 3, lty=2)
+lines(new_preds, col = 'purple', lwd = 3, lty = 3)
+
+legend("topright", c("Raw Data", "Raw Data Modeled", "Predicted"), 
+       col = c("black", "green","purple"), lwd = c(1, 3,3), lty = c(1,2,3))
+
+
+axis(1, c(1, 282, 569, 853, 1139, 1424), c("", "", "", "", "", ""))
+
+axis(1, c(140, 420, 700, 1000, 1280),
+     tick = FALSE,
+     c(" 1 (OFF)", 
+       " 2 (ON)",
+       " 3 (ON)",
+       " 4 (ON)",
+       " 5 (ON)"))
+```

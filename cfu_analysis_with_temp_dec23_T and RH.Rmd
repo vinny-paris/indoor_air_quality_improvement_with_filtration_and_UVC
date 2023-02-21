@@ -1,0 +1,67 @@
+---
+title: "cfu_with_temp"
+author: "Vinny Paris, amended by P.L."
+date: "Finalized in Feb. 2023"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+#read in the data and look at the first few rows
+cfu_temps <- read.csv('cfu_with_temp_RH_updated.csv')
+head(cfu_temps)
+
+#Create a new column. Add A 0, then 6 repetitions of 1, and 6 repetitions of 0.
+cfu_temps$kryton <- c(0, rep(1, 6), rep(0, 6))
+
+#look at the names of the variables
+colnames(cfu_temps)
+which(colnames(cfu_temps) == "kryton")
+
+#change the name of the second column in the data frame "cfu_temps
+#to simplify the typing/coding
+colnames(cfu_temps)[2] <- 'temp'
+
+#a simply linear model is ran with CFU as the response
+#and temperature, kryton unit status, and the relative
+#humidity as factors
+cfu_model <- lm(CFU ~ temp + RH + kryton , data = cfu_temps)
+
+#set the default graphical parameters for plotting multiple figures in a 2x2 grid
+par(mfrow = c(2,2))
+
+#look at the residuals to judge applicability of the model
+plot(cfu_model)
+
+#true anova
+anova(cfu_model)
+
+
+#addition
+#version 1.4-2 for coin
+#version 4.2.2 for stats
+library(coin)
+library(stats)
+
+ON <- c(1555.555556,
+1688.888889,
+1555.555556,
+867,
+2311.111111,
+2088.888889)
+OFF <- c(3555.555556,2000,4133,4578,3022,2356,2444)
+  
+#z <- data.frame(group=c(rep("ON", length(ON)), rep("OFF", length(OFF))), value=c(ON, OFF))
+  #wilcox.test(value ~ group, data=z, distribution="exact")
+
+#t-test is ran for teh difference in
+#means; this should be one sided
+t.test(ON, OFF, alternative = "less")
+
+```
+
+
+
+
